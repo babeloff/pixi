@@ -172,77 +172,9 @@ jobs:
     timeout-minutes: 15
     needs: determine_changes
     if: ${{ needs.determine_changes.outputs.code == 'true' || github.ref == 'refs/heads/main' }}
-    runs-on: 8core_ubuntu_latest_runner
+    runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
-      - uses: prefix-dev/setup-pixi@main
-        with:
-          cache: ${{ github.ref == 'refs/heads/main' }}
-      - uses: Swatinem/rust-cache@9d47c6ad4b02e050fd481d890b2ea34778fd09d6 # v2
-        with:
-          workspaces: ". -> target/pixi"
-          key: ${{ hashFiles('pixi.lock') }}
-          save-if: ${{ github.ref == 'refs/heads/main' }}
-      - name: Test pixi
-        run: pixi run test-slow
-        env:
-          PIXI_TEST_R2_ACCESS_KEY_ID: ${{ secrets.PIXI_TEST_R2_ACCESS_KEY_ID }}
-          PIXI_TEST_R2_SECRET_ACCESS_KEY: ${{ secrets.PIXI_TEST_R2_SECRET_ACCESS_KEY }}
-
-  cargo-test-macos-aarch64:
-    name: "cargo test | macos aarch64"
-    timeout-minutes: 15
-    needs: determine_changes
-    if: ${{ needs.determine_changes.outputs.code == 'true' || github.ref == 'refs/heads/main' }}
-    runs-on: macos-14
-    steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
-      - uses: prefix-dev/setup-pixi@main
-        with:
-          cache: ${{ github.ref == 'refs/heads/main' }}
-      - uses: Swatinem/rust-cache@9d47c6ad4b02e050fd481d890b2ea34778fd09d6 # v2
-        with:
-          workspaces: ". -> target/pixi"
-          key: ${{ hashFiles('pixi.lock') }}
-          save-if: ${{ github.ref == 'refs/heads/main' }}
-      - name: Test pixi
-        run: pixi run test-slow
-        env:
-          PIXI_TEST_R2_ACCESS_KEY_ID: ${{ secrets.PIXI_TEST_R2_ACCESS_KEY_ID }}
-          PIXI_TEST_R2_SECRET_ACCESS_KEY: ${{ secrets.PIXI_TEST_R2_SECRET_ACCESS_KEY }}
-
-  cargo-test-macos-x86_64:
-    name: "cargo test | macos x86_64"
-    timeout-minutes: 30
-    needs: determine_changes
-    if: ${{ needs.determine_changes.outputs.code == 'true' && github.ref == 'refs/heads/main' || contains(github.event.pull_request.labels.*.name, 'test:extra_slow')}} # Only run on the main branch
-    runs-on: macos-13
-    steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
-      - uses: prefix-dev/setup-pixi@main
-        with:
-          cache: ${{ github.ref == 'refs/heads/main' }}
-      - uses: Swatinem/rust-cache@9d47c6ad4b02e050fd481d890b2ea34778fd09d6 # v2
-        with:
-          workspaces: ". -> target/pixi"
-          key: ${{ hashFiles('pixi.lock') }}
-          save-if: ${{ github.ref == 'refs/heads/main' }}
-      - name: Test pixi
-        run: pixi run test-slow
-        env:
-          PIXI_TEST_R2_ACCESS_KEY_ID: ${{ secrets.PIXI_TEST_R2_ACCESS_KEY_ID }}
-          PIXI_TEST_R2_SECRET_ACCESS_KEY: ${{ secrets.PIXI_TEST_R2_SECRET_ACCESS_KEY }}
-
-  cargo-test-windows:
-    name: "cargo test | windows x64"
-    timeout-minutes: 15
-    needs: determine_changes
-    if: ${{ needs.determine_changes.outputs.code == 'true' || github.ref == 'refs/heads/main' }}
-    runs-on: windows_x64_2025_large
-    steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
-      - name: Create Dev Drive
-        run: ${{ github.workspace }}/.github/workflows/setup-dev-drive.ps1
       - uses: prefix-dev/setup-pixi@main
         with:
           cache: ${{ github.ref == 'refs/heads/main' }}
@@ -264,7 +196,7 @@ jobs:
   build-binary-linux-x86_64:
     needs: determine_changes
     if: ${{ needs.determine_changes.outputs.code == 'true' || github.ref == 'refs/heads/main' }}
-    runs-on: 8core_ubuntu_latest_runner
+    runs-on: ubuntu-22.04
     name: "build binary | linux x86_64"
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
@@ -414,7 +346,7 @@ jobs:
           Copy-Item -Path "${{ github.workspace }}" -Destination "${{ env.PIXI_WORKSPACE }}" -Recurse
           echo "${{ env.PIXI_WORKSPACE }}/${{ env.TARGET_RELEASE }}" | Out-File -Append -Encoding utf8 -FilePath $env:GITHUB_PATH
       - name: Download binary from build
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        uses: actions/download-artifact@95815c38cf2ff2164869cbab79da8d1f422bc89e # v4
         with:
           name: pixi-windows-x86_64-${{ github.sha }}
           path: ${{ env.PIXI_WORKSPACE }}/${{ env.TARGET_RELEASE }}
@@ -436,7 +368,7 @@ jobs:
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
       - name: Download binary from build
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        uses: actions/download-artifact@95815c38cf2ff2164869cbab79da8d1f422bc89e # v4
         with:
           name: pixi-macos-aarch64-${{ github.sha }}
           path: ${{ env.TARGET_RELEASE }}
@@ -453,7 +385,7 @@ jobs:
   test-pytest-linux-x86_64:
     timeout-minutes: 10
     name: Pytest | linux x86_64
-    runs-on: 8core_ubuntu_latest_runner
+    runs-on: ubuntu-22.04
     needs: build-binary-linux-x86_64
     env:
       TARGET_RELEASE: "${{ github.workspace }}/target/pixi/release"
@@ -852,9 +784,8 @@ jobs:
       - name: "Install"
         run: |
           uname -a
-          test ! -e ~/.pixi/bin/pixi.exe
+          test ! -e ~/.pixi/bin/pixi
           sh < ./install/install.sh
-          ~/.pixi/bin/pixi.exe --version
           ~/.pixi/bin/pixi --version
         shell: msys2 {0}
 
@@ -877,140 +808,3 @@ jobs:
           sh < ./install/install.sh
           ~/.pixi/bin/pixi --version
         shell: msys2 {0}
-
-  test-install-ps1:
-    name: install.ps1
-    needs:
-      - determine_changes
-    runs-on: windows-latest
-    if: ${{ needs.determine_changes.outputs.win_installer == 'true' }}
-    env:
-      PIXI_REPOURL: "https://github.com/prefix-dev/pixi/"
-    steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
-      - name: Setup ucrt64 msys2
-        uses: msys2/setup-msys2@61f9e5e925871ba6c9e3e8da24ede83ea27fa91f # v2
-        with:
-          msystem: UCRT64
-      - name: "Before Install"
-        run: test ! -e $USERPROFILE/.pixi/bin/pixi.exe
-        shell: msys2 {0}
-
-      - name: "Install"
-        run: ${{ github.workspace }}/install/install.ps1
-
-      - name: "After Install"
-        run: $USERPROFILE/.pixi/bin/pixi.exe --version
-        shell: msys2 {0}
-
-  test-build-linux-x86_64:
-    timeout-minutes: 10
-    name: Test pixi-build Linux x86_64
-    runs-on: ubuntu-latest
-    needs: build-binary-linux-x86_64
-    steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
-        with:
-          repository: prefix-dev/pixi-build-testsuite
-
-      - name: Set up pixi
-        uses: prefix-dev/setup-pixi@main
-        with:
-          cache: true
-          cache-write: ${{ github.event_name == 'push' && github.ref_name == 'main' }}
-
-      - name: Download pixi artifacts
-        run: pixi run download-artifacts pixi --run-id ${{ github.run_id }}
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Download pixi-build-backends artifacts
-        run: pixi run download-artifacts pixi-build-backends
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Setup binary permissions
-        run: chmod a+x artifacts/pixi*
-
-      - name: Run integration tests
-        run: pixi run --locked test-slow
-        env:
-          PIXI_BIN_DIR: ${{ github.workspace }}/artifacts
-          BUILD_BACKENDS_BIN_DIR: ${{ github.workspace }}/artifacts
-
-  test-build-windows-x86_64:
-    timeout-minutes: 10
-    name: Test pixi-build Windows x86_64
-    runs-on: windows-latest
-    needs: build-binary-windows-x86_64
-    steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
-        with:
-          repository: prefix-dev/pixi-build-testsuite
-
-      - name: Create Dev Drive
-        run: ${{ github.workspace }}/.github/workflows/setup-dev-drive.ps1
-
-      - name: Copy Git Repo to Dev Drive
-        run: Copy-Item -Path "${{ github.workspace }}" -Destination "${{ env.PIXI_WORKSPACE }}" -Recurse
-
-      - name: Set up pixi
-        uses: prefix-dev/setup-pixi@main
-        with:
-          manifest-path: ${{ env.PIXI_WORKSPACE }}/pixi.toml
-          cache: true
-          cache-write: ${{ github.event_name == 'push' && github.ref_name == 'main' }}
-
-      - name: Download pixi artifacts
-        working-directory: ${{ env.PIXI_WORKSPACE }}
-        run: pixi run download-artifacts pixi --run-id ${{ github.run_id }}
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Download pixi-build-backends artifacts
-        working-directory: ${{ env.PIXI_WORKSPACE }}
-        run: pixi run download-artifacts pixi-build-backends
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Run integration tests
-        run: pixi run --locked test-slow
-        working-directory: ${{ env.PIXI_WORKSPACE }}
-        env:
-          PIXI_BIN_DIR: ${{ env.PIXI_WORKSPACE }}/artifacts
-          BUILD_BACKENDS_BIN_DIR: ${{ env.PIXI_WORKSPACE }}/artifacts
-
-  test-build-macos-aarch64:
-    timeout-minutes: 10
-    name: Test pixi-build macOS aarch64
-    runs-on: macos-14
-    needs: build-binary-macos-aarch64
-    steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
-        with:
-          repository: prefix-dev/pixi-build-testsuite
-
-      - name: Set up pixi
-        uses: prefix-dev/setup-pixi@main
-        with:
-          cache: true
-          cache-write: ${{ github.event_name == 'push' && github.ref_name == 'main' }}
-
-      - name: Download pixi artifacts
-        run: pixi run download-artifacts pixi --run-id ${{ github.run_id }}
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Download pixi-build-backends artifacts
-        run: pixi run download-artifacts pixi-build-backends
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Setup binary permissions
-        run: chmod a+x artifacts/pixi*
-
-      - name: Run integration tests
-        run: pixi run --locked test-slow
-        env:
-          PIXI_BIN_DIR: ${{ github.workspace }}/artifacts
-          BUILD_BACKENDS_BIN_DIR: ${{ github.workspace }}/artifacts

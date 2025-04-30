@@ -293,18 +293,6 @@ jobs:
             # Extract the artifact contents
             tar -xvf "$artifact" -O pixi > unpacked-artifacts/$base_name
           done
-      - name: Unpack binaries zip
-        run: |
-          set -e pipefail # fail if any command fails
-          for artifact in target/distrib/pixi-*.zip; do
-              echo artifact: $artifact
-              # Extract the base name without the extension
-              base_name=$(basename "$artifact" .zip)
-
-              # Extract the artifact contents
-              # Because zip is only used on windows we can assume the binary is an exe
-              unzip -p "$artifact" pixi.exe > unpacked-artifacts/$base_name.exe
-          done
 
       # Upload unpacked artifacts, not sure how to do this in one go as you have to name the artifact
       - name: Upload unpacked artifact for pixi-aarch64-unknown-linux-musl
