@@ -23,6 +23,7 @@ pub mod has_specs;
 pub mod info;
 pub mod init;
 pub mod install;
+pub mod install_to_prefix;
 pub mod list;
 pub mod lock;
 pub mod reinstall;
@@ -141,6 +142,8 @@ pub enum Command {
     Init(init::Args),
     #[clap(visible_alias = "i")]
     Install(install::Args),
+    /// Install packages from a pixi.lock file to a specified directory
+    InstallToPrefix(install_to_prefix::Args),
     #[clap(visible_alias = "ls")]
     List(list::Args),
     Lock(lock::Args),
@@ -265,6 +268,7 @@ pub async fn execute_command(command: Command) -> miette::Result<()> {
         Command::Global(cmd) => global::execute(cmd).await,
         Command::Auth(cmd) => rattler::cli::auth::execute(cmd).await.into_diagnostic(),
         Command::Install(cmd) => install::execute(cmd).await,
+        Command::InstallToPrefix(cmd) => install_to_prefix::execute(cmd).await,
         Command::Reinstall(cmd) => reinstall::execute(cmd).await,
         Command::Shell(cmd) => shell::execute(cmd).await,
         Command::ShellHook(cmd) => shell_hook::execute(cmd).await,
