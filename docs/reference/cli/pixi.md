@@ -22,6 +22,7 @@ pixi [OPTIONS] <COMMAND>
 | [`info`](pixi/info.md) | Information about the system, workspace and environments for the current machine |
 | [`init`](pixi/init.md) | Creates a new workspace |
 | [`install`](pixi/install.md) | Install an environment, both updating the lockfile and installing the environment |
+| [`install-to-prefix`](pixi/install-to-prefix.md) | Install packages from a pixi.lock file to a specified directory |
 | [`list`](pixi/list.md) | List workspace's packages |
 | [`lock`](pixi/lock.md) | Solve environment and update the lock file without installing the environments |
 | [`reinstall`](pixi/reinstall.md) | Re-install an environment, both updating the lockfile and re-installing the environment |
