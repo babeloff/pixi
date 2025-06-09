@@ -148,7 +148,8 @@ mold = ">=2.33.0,<3.0"
 vs2017_win-64 = ">=19.16.27033"
 
 [feature.build.activation]
-env.CARGO_TARGET_DIR = "target/pixi"
+# env.CARGO_TARGET_DIR = '$([ -n "$CI" ] && echo target/pixi || echo .pixi/envs/target)'
+env.CARGO_TARGET_DIR = '$([ -n "$GITHUB_ACTION" ] && echo target/pixi || echo .pixi/envs/target)'
 
 [feature.build.target.unix.activation]
 scripts = ["scripts/activate.sh"]
