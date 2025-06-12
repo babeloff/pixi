@@ -27,7 +27,8 @@ use crate::{
     lock_file::{ReinstallPackages, UpdateLockFileOptions},
     task::{
         AmbiguousTask, CanSkip, ExecutableTask, FailedToParseShellScript, InvalidWorkingDirectory,
-        SearchEnvironments, TaskAndEnvironment, TaskGraph, get_task_env,
+        SearchEnvironments, TaskAndEnvironment, TaskExecutionError as TaskExecError, TaskGraph,
+        get_task_env,
     },
     workspace::{Environment, errors::UnsupportedPlatformError},
 };
@@ -298,7 +299,7 @@ pub async fn execute(args: Args) -> miette::Result<()> {
             Ok(_) => {
                 task_idx += 1;
             }
-            Err(TaskExecutionError::NonZeroExitCode(code)) => {
+            Err(TaskRunError::NonZeroExitCode(code)) => {
                 if code == 127 {
                     command_not_found(&workspace, explicit_environment);
                 }
@@ -360,9 +361,13 @@ fn command_not_found<'p>(workspace: &'p Workspace, explicit_environment: Option<
 }
 
 #[derive(Debug, Error, Diagnostic)]
-enum TaskExecutionError {
+enum TaskRunError {
     #[error("the script exited with a non-zero exit code {0}")]
     NonZeroExitCode(i32),
+
+    #[error(transparent)]
+    #[diagnostic(transparent)]
+    TaskExecutionError(#[from] TaskExecError),
 
     #[error(transparent)]
     #[diagnostic(transparent)]
@@ -381,23 +386,36 @@ enum TaskExecutionError {
 async fn execute_task(
     task: &ExecutableTask<'_>,
     command_env: &HashMap<OsString, OsString>,
-) -> Result<(), TaskExecutionError> {
-    let Some(script) = task.as_deno_script()? else {
-        return Ok(());
-    };
-    let cwd = task.working_directory()?;
+) -> Result<(), TaskRunError> {
+    // Check if task has custom interpreter
+    if let Some(interpreter) = task.task().interpreter() {
+        // Use new path for custom interpreters with real-time output
+        let output = task
+            .execute_with_interpreter(command_env, None, interpreter)
+            .await?;
+        if output.exit_code != 0 {
+            return Err(TaskRunError::NonZeroExitCode(output.exit_code));
+        }
+        // Output already printed via inherit mode
+    } else {
+        // Keep original path for deno_task_shell (unchanged)
+        let Some(script) = task.as_deno_script()? else {
+            return Ok(());
+        };
+        let cwd = task.working_directory()?;
 
-    let status_code = deno_task_shell::execute(
-        script,
-        command_env.clone(),
-        cwd,
-        Default::default(),
-        Default::default(),
-    )
-    .await;
+        let status_code = deno_task_shell::execute(
+            script,
+            command_env.clone(),
+            cwd,
+            Default::default(),
+            Default::default(),
+        )
+        .await;
 
-    if status_code != 0 {
-        return Err(TaskExecutionError::NonZeroExitCode(status_code));
+        if status_code != 0 {
+            return Err(TaskRunError::NonZeroExitCode(status_code));
+        }
     }
 
     Ok(())

@@ -6,9 +6,7 @@ use std::{
     path::PathBuf,
 };
 
-use deno_task_shell::{
-    ShellPipeWriter, ShellState, execute_with_pipes, parser::SequentialList, pipe,
-};
+use deno_task_shell::{ShellPipeWriter, parser::SequentialList, pipe};
 use fs_err::tokio as tokio_fs;
 use itertools::Itertools;
 use miette::{Context, Diagnostic};
@@ -64,6 +62,19 @@ pub enum TaskExecutionError {
 
     #[error(transparent)]
     FailedToParseShellScript(#[from] FailedToParseShellScript),
+
+    #[error(transparent)]
+    TemplateStringError(#[from] TemplateStringError),
+
+    #[error("failed to execute command '{command}'")]
+    FailedToExecute {
+        command: String,
+        #[source]
+        source: std::io::Error,
+    },
+
+    #[error("task exited with non-zero exit code: {0}")]
+    NonZeroExitCode(i32),
 }
 
 #[derive(Debug, Error, Diagnostic)]
@@ -246,27 +257,111 @@ impl<'p> ExecutableTask<'p> {
                 stderr: String::new(),
             });
         };
+
         let cwd = self.working_directory()?;
+        let (stdout_writer, stdout_handle) = get_output_writer_and_handle();
+        let (stderr_writer, stderr_handle) = get_output_writer_and_handle();
+
         let (stdin, mut stdin_writer) = pipe();
-        if let Some(stdin) = input {
+        if let Some(input_data) = input {
             stdin_writer
-                .write_all(stdin)
+                .write_all(input_data)
                 .expect("should be able to write to stdin");
         }
         drop(stdin_writer); // prevent a deadlock by dropping the writer
-        let (stdout, stdout_handle) = get_output_writer_and_handle();
-        let (stderr, stderr_handle) = get_output_writer_and_handle();
-        let state = ShellState::new(
-            command_env.clone(),
-            cwd,
-            Default::default(),
-            Default::default(),
-        );
-        let code = execute_with_pipes(script, state, stdin, stdout, stderr).await;
+
+        let exit_code = deno_task_shell::execute_with_pipes(
+            script,
+            deno_task_shell::ShellState::new(
+                command_env.clone(),
+                cwd,
+                Default::default(),
+                Default::default(),
+            ),
+            stdin,
+            stdout_writer,
+            stderr_writer,
+        )
+        .await;
+
+        let stdout = stdout_handle
+            .await
+            .expect("Failed to read stdout from task execution");
+        let stderr = stderr_handle
+            .await
+            .expect("Failed to read stderr from task execution");
+
         Ok(RunOutput {
-            exit_code: code,
-            stdout: stdout_handle.await.expect("should be able to get stdout"),
-            stderr: stderr_handle.await.expect("should be able to get stderr"),
+            exit_code,
+            stdout,
+            stderr,
+        })
+    }
+
+    /// Executes the task using a custom interpreter.
+    pub async fn execute_with_interpreter(
+        &self,
+        command_env: &HashMap<OsString, OsString>,
+        input: Option<&[u8]>,
+        interpreter: &str,
+    ) -> Result<RunOutput, TaskExecutionError> {
+        use tokio::io::AsyncWriteExt;
+        use tokio::process::Command;
+
+        let Some(command) = self.full_command()? else {
+            return Ok(RunOutput {
+                exit_code: 0,
+                stdout: String::new(),
+                stderr: String::new(),
+            });
+        };
+
+        let cwd = self.working_directory()?;
+        let mut child = Command::new(interpreter)
+            .arg("-c")
+            .arg(&command)
+            .current_dir(&cwd)
+            .envs(command_env)
+            .stdin(std::process::Stdio::piped())
+            .stdout(std::process::Stdio::inherit())
+            .stderr(std::process::Stdio::inherit())
+            .spawn()
+            .map_err(|e| TaskExecutionError::FailedToExecute {
+                command: format!("{} -c {}", interpreter, command),
+                source: e,
+            })?;
+
+        // Handle stdin
+        if let Some(input_data) = input {
+            if let Some(mut stdin) = child.stdin.take() {
+                stdin.write_all(input_data).await.map_err(|e| {
+                    TaskExecutionError::FailedToExecute {
+                        command: format!("{} -c {}", interpreter, command),
+                        source: e,
+                    }
+                })?;
+                stdin
+                    .shutdown()
+                    .await
+                    .map_err(|e| TaskExecutionError::FailedToExecute {
+                        command: format!("{} -c {}", interpreter, command),
+                        source: e,
+                    })?;
+            }
+        }
+
+        let exit_status = child
+            .wait()
+            .await
+            .map_err(|e| TaskExecutionError::FailedToExecute {
+                command: format!("{} -c {}", interpreter, command),
+                source: e,
+            })?;
+
+        Ok(RunOutput {
+            exit_code: exit_status.code().unwrap_or(-1),
+            stdout: String::new(),
+            stderr: String::new(),
         })
     }
 

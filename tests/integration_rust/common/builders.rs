@@ -42,7 +42,10 @@ use pixi::{
         add, cli_config::DependencyConfig, init, install, remove, search, task, update, workspace,
     },
 };
-use pixi_manifest::{EnvironmentName, FeatureName, SpecType, task::Dependency};
+use pixi_manifest::{
+    EnvironmentName, FeatureName, SpecType,
+    task::{Dependency, TaskArg},
+};
 use rattler_conda_types::{NamedChannelOrUrl, Platform, RepoDataRecord};
 use url::Url;
 
@@ -339,6 +342,18 @@ impl TaskAddBuilder {
     /// With this environment variable
     pub fn with_env(mut self, env: Vec<(String, String)>) -> Self {
         self.args.env = env;
+        self
+    }
+
+    /// With this custom interpreter
+    pub fn with_interpreter(mut self, interpreter: impl ToString) -> Self {
+        self.args.interpreter = Some(interpreter.to_string());
+        self
+    }
+
+    /// With these task arguments
+    pub fn with_args(mut self, args: Vec<TaskArg>) -> Self {
+        self.args.args = Some(args);
         self
     }
 

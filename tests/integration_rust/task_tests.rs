@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::{path::PathBuf, str::FromStr};
 
 use pixi::{
     cli::{cli_config::WorkspaceConfig, run::Args},
@@ -6,7 +6,7 @@ use pixi::{
 };
 use pixi_manifest::{
     FeatureName, Task,
-    task::{CmdArgs, TemplateString},
+    task::{ArgName, CmdArgs, TaskArg, TemplateString},
 };
 use rattler_conda_types::Platform;
 
@@ -323,3 +323,69 @@ async fn test_clean_env() {
 
 // When adding another test with an environment variable, please choose a unique
 // name to avoid collisions
+
+#[tokio::test]
+async fn test_custom_interpreter_with_env_and_cwd() {
+    let pixi = PixiControl::new().unwrap();
+    pixi.init().without_channels().await.unwrap();
+
+    // Create test directory
+    fs_err::create_dir(pixi.workspace_path().join("test_dir")).unwrap();
+
+    // Add a task with custom interpreter, environment variables, working directory, and template processing
+    // This comprehensive test verifies all custom interpreter features:
+    // 1. Custom interpreter execution (bash)
+    // 2. Environment variable setting and access
+    // 3. Working directory change
+    // 4. Template processing with task arguments
+    pixi.tasks()
+        .add("complex-test".into(), None, FeatureName::default())
+        .with_commands(["echo \"Message: {{ message }}, TEST_VAR: $TEST_VAR, PWD: $(pwd)\""])
+        .with_interpreter("bash")
+        .with_env(vec![(
+            String::from("TEST_VAR"),
+            String::from("custom_value"),
+        )])
+        .with_cwd(PathBuf::from("test_dir"))
+        .with_args(vec![TaskArg {
+            name: ArgName::from_str("message").unwrap(),
+            default: None,
+        }])
+        .execute()
+        .await
+        .unwrap();
+
+    // Verify the task was created correctly
+    let project = pixi.workspace().unwrap();
+    let tasks = project.default_environment().tasks(None).unwrap();
+    let task = tasks.get(&<TaskName>::from("complex-test")).unwrap();
+
+    // Check that the task has all the expected properties
+    assert_eq!(task.interpreter(), Some("bash"));
+    assert!(matches!(task, Task::Execute(_)));
+
+    // Run the task with template argument and verify all features work together:
+    // - Template processing ({{ message }} -> "Hello Template")
+    // - Environment variable access ($TEST_VAR -> "custom_value")
+    // - Working directory change (pwd shows test_dir)
+    // - Custom interpreter execution (bash processes the command)
+    let result = pixi
+        .run(Args {
+            task: vec!["complex-test".to_string(), "Hello Template".to_string()],
+            workspace_config: WorkspaceConfig {
+                manifest_path: None,
+            },
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+
+    assert_eq!(result.exit_code, 0);
+    // Verify all features work together:
+    // - Template was processed: "Hello Template" appears in output
+    // - Environment variable was set: "custom_value" appears in output
+    // - Working directory was changed: "test_dir" appears in output
+    assert!(result.stdout.contains("Message: Hello Template"));
+    assert!(result.stdout.contains("TEST_VAR: custom_value"));
+    assert!(result.stdout.contains("test_dir"));
+}
