@@ -382,7 +382,7 @@ async fn execute_task(
     task: &ExecutableTask<'_>,
     command_env: &HashMap<OsString, OsString>,
 ) -> Result<(), TaskExecutionError> {
-    let Some((script, stdin_pipe)) = task.prepare_execution(None)? else {
+    let Some((script, stdin_pipe)) = task.prepare_execution()? else {
         // No script to execute, task is complete
         return Ok(());
     };
