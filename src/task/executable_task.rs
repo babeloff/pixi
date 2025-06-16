@@ -239,7 +239,6 @@ impl<'p> ExecutableTask<'p> {
     /// Returns None if there is no script to execute (e.g., for alias tasks).
     pub(crate) fn prepare_execution(
         &self,
-        input: Option<&[u8]>,
     ) -> Result<
         Option<(
             deno_task_shell::parser::SequentialList,
@@ -253,13 +252,7 @@ impl<'p> ExecutableTask<'p> {
                 return Ok(None);
             };
 
-            let (stdin, mut stdin_writer) = pipe();
-            if let Some(stdin_data) = input {
-                stdin_writer
-                    .write_all(stdin_data)
-                    .expect("should be able to write to stdin");
-            }
-            drop(stdin_writer); // prevent a deadlock by dropping the writer
+            let stdin = deno_task_shell::ShellPipeReader::stdin();
             return Ok(Some((deno_script, stdin)));
         };
 
@@ -285,9 +278,8 @@ impl<'p> ExecutableTask<'p> {
     pub async fn execute_with_pipes(
         &self,
         command_env: &HashMap<OsString, OsString>,
-        input: Option<&[u8]>,
     ) -> Result<RunOutput, TaskExecutionError> {
-        let Some((script, stdin)) = self.prepare_execution(input)? else {
+        let Some((script, stdin)) = self.prepare_execution()? else {
             // No script to execute, return empty output
             return Ok(RunOutput {
                 exit_code: 0,
